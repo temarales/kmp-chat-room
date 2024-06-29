@@ -17,35 +17,32 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.w3c.dom.*
 
-@OptIn(DelicateCoroutinesApi::class)
-fun main() {
-    GlobalScope.launch {
-        val transport = WebSocketClientTransport(Js, "127.0.0.1", path = "rsocket", port = 8080)
-        val connector = RSocketConnector()
 
-        val rsocket: RSocket = connector.connect(transport)
-        val dataFlow: Flow<DataEntry> = rsocket.requestStream(Payload.Empty).map {
-            Json.decodeFromString<DataEntry>(it.data.readText())
-        }
+suspend fun main() = coroutineScope {
+    val transport = WebSocketClientTransport(Js, "127.0.0.1", path = "rsocket", port = 8080)
+    val connector = RSocketConnector()
 
-        launch {
-            dataFlow.collect { dataEntry -> writeMessage("[user ${dataEntry.userId}]: ${dataEntry.message}") }
-        }
-
-        suspend fun sendEvent(event: NewMessageEvent) {
-            rsocket.fireAndForget(buildPayload { data(Json.encodeToString(event)) })
-        }
-
-        val sendButton = document.getElementById("sendButton") as HTMLElement
-        val commandInput = document.getElementById("commandInput") as HTMLInputElement
-
-        sendButton.addEventListener("click", {
-            val message = commandInput.value
-            launch { sendEvent(NewMessageEvent(message)) }
-            commandInput.value = ""
-        })
+    val rsocket: RSocket = connector.connect(transport)
+    val dataFlow: Flow<DataEntry> = rsocket.requestStream(Payload.Empty).map {
+        Json.decodeFromString<DataEntry>(it.data.readText())
     }
 
+    launch {
+        dataFlow.collect { dataEntry -> writeMessage("[user ${dataEntry.userId}]: ${dataEntry.message}") }
+    }
+
+    suspend fun sendEvent(event: NewMessageEvent) {
+        rsocket.fireAndForget(buildPayload { data(Json.encodeToString(event)) })
+    }
+
+    val sendButton = document.getElementById("sendButton") as HTMLElement
+    val commandInput = document.getElementById("commandInput") as HTMLInputElement
+
+    sendButton.addEventListener("click", {
+        val message = commandInput.value
+        launch { sendEvent(NewMessageEvent(message)) }
+        commandInput.value = ""
+    })
 }
 
 
