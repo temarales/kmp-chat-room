@@ -1,0 +1,84 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url "kotlin.bintray.com/kotlinx" }
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.21"
+    }
+}
+
+plugins {
+    id 'org.jetbrains.kotlin.multiplatform' version '2.0.0'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '2.0.0'
+}
+
+kotlin {
+    targets {
+        js('frontend', IR) {
+            browser {
+                testTask {
+                    enabled = false
+                }
+
+                distribution {
+                    directory = file("$projectDir/src/backendMain/resources/web")
+                }
+                binaries.executable()
+            }
+        }
+        jvm('backend')
+    }
+
+    sourceSets.each {
+        it.dependencies {
+            implementation(project.dependencies.enforcedPlatform("io.ktor:ktor-bom:2.3.11"))
+        }
+    }
+
+    sourceSets {
+        backendMain {
+            dependencies {
+                implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.21"
+                implementation "io.ktor:ktor-server-netty"
+                implementation "io.ktor:ktor-server-websockets"
+                implementation "io.ktor:ktor-server-call-logging"
+                implementation "io.ktor:ktor-server-default-headers"
+                implementation "io.ktor:ktor-server-sessions"
+                implementation "ch.qos.logback:logback-classic:1.4.6"
+                implementation "io.rsocket.kotlin:rsocket-ktor-server:0.16.0"
+                implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1"
+            }
+        }
+
+        frontendMain {
+            dependencies {
+                implementation "org.jetbrains.kotlin:kotlin-stdlib-js"
+                implementation "io.ktor:ktor-client-websockets"
+                implementation "io.ktor:ktor-client-js"
+                implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core-js:1.6.4"
+                implementation "io.rsocket.kotlin:rsocket-ktor-client:0.16.0"
+                implementation "io.rsocket.kotlin:rsocket-transport-ktor-websocket-client:0.16.0"
+                implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1"
+            }
+        }
+
+        commonMain {
+            dependencies {
+                implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1"
+            }
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+tasks.register("run", JavaExec) {
+    dependsOn(frontendBrowserDistribution)
+    dependsOn(backendMainClasses)
+    mainClass.set("io.chat.backend.ChatApplicationKt")
+    classpath(configurations.backendRuntimeClasspath, backendJar)
+    args = []
+}
